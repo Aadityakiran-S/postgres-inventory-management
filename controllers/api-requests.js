@@ -1,9 +1,9 @@
 const executeDBQuery = require('../helpers/query-execution-helper.js');
-require('dotenv').config();
+const queries = require('../db/queries.json');
 
 const getData = async (req, res) => {
     try {
-        const queryResult = executeDBQuery("SELECT * FROM customer")
+        const queryResult = executeDBQuery(queries.selectAllFromCustomers);
         return res.status(201).json({ success: true, data: queryResult })
     }
     catch (error) {

@@ -1,0 +1,3 @@
+{
+  "selectAllFromCustomers": "SELECT * FROM customers"
+}
