@@ -16,4 +16,12 @@ client.on("end", () => {
     console.log("Connection ended");
 })
 
+client.on('row', (row) => {
+    console.log('row!', row);
+})
+
+client.on('error', (err) => {
+    console.error(err.stack);
+})
+
 module.exports = client;
