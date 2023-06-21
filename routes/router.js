@@ -1,7 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const { getData } = require('../controllers/api-requests.js');
+const { addPurchaseInvoice, editPurchaseInvoice, deletePurchaseInvoice, listAllInvoices } = require('../modules/purchase/purchase-controller');
 
-router.route('/').get(getData);
+//For now, putting all purchase routes here. Can move to it's own folder if it gets too crowded
+router.route('/').get(listAllInvoices);
+router.route('/').post(addPurchaseInvoice);
+router.route('/').patch(editPurchaseInvoice);
+router.route('/').delete(deletePurchaseInvoice);
 
 module.exports = router;
