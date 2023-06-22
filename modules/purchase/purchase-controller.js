@@ -1,13 +1,20 @@
 const executeDBQuery = require('../../helpers/query-execution-helper.js');
-const { selectAllFromCustomers } = require('./purchase-queries.json');
+const { selectAllItemsFromInvoice } = require('./purchase-queries.json');
 
 let query = {
-    name: "Add purchase inovice to db",
-    text: selectAllFromCustomers,
+    name: `Give suitable name here`,
+    text: selectAllItemsFromInvoice,
     values: []
 }
 
-const addPurchaseInvoice = async (req, res) => {
+//#TOASK: Add validation later?
+
+const addPurchaseInvoice = async ({ body }, res) => {
+    console.log(body);
+    /*
+        1) Add basic details in invoice table
+        2) Iterate over internal array to put details in invoice-item table
+    */
     try {
         const queryResult = executeDBQuery(query);
         return res.status(201).json({ success: true, data: queryResult })
@@ -19,7 +26,7 @@ const addPurchaseInvoice = async (req, res) => {
 
 const editPurchaseInvoice = async (req, res) => {
     try {
-        const queryResult = executeDBQuery(selectAllFromCustomers);
+        const queryResult = executeDBQuery(selectAllItemsFromInvoice);
         return res.status(201).json({ success: true, data: queryResult })
     }
     catch (error) {
@@ -27,9 +34,10 @@ const editPurchaseInvoice = async (req, res) => {
     }
 }
 
+//#TOASK: Soft Delete?
 const deletePurchaseInvoice = async (req, res) => {
     try {
-        const queryResult = executeDBQuery(selectAllFromCustomers);
+        const queryResult = executeDBQuery(selectAllItemsFromInvoice);
         return res.status(201).json({ success: true, data: queryResult })
     }
     catch (error) {
@@ -37,9 +45,10 @@ const deletePurchaseInvoice = async (req, res) => {
     }
 }
 
+//#TOASK: Add Pagination later? 
 const listAllInvoices = async (req, res) => {
     try {
-        const queryResult = executeDBQuery(selectAllFromCustomers);
+        const queryResult = executeDBQuery(selectAllItemsFromInvoice);
         return res.status(201).json({ success: true, data: queryResult })
     }
     catch (error) {
