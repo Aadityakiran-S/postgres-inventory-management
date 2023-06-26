@@ -1,3 +1,5 @@
 {
-  "selectAllItemsFromInvoice": "SELECT * FROM invoice"
+  "selectAllItemsFromInvoice": "SELECT * FROM invoice",
+  "addInvoice": "INSERT INTO invoice (date, total_price) VALUES ($1, $2) RETURNING invoice_id;",
+  "addInvoiceItem": "INSERT INTO invoice_item (invoice_id, date, product_id, quantity, unit_price, sub_total_price) VALUES ($1, $2, $3, $4, $5, $6);"
 }
