@@ -1,5 +1,6 @@
 const client = require('../db/database.js');
 
+//#TOASK: Since connect and disconnect isn't required when pooling is enabld, shall I get rid of this?
 const executeDBQuery = async (query) => {
     let result;
     try {

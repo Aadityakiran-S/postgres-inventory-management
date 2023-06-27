@@ -1,23 +1,22 @@
 const executeDBQuery = require('../../helpers/query-execution-helper.js');
-const { selectAllItemsFromInvoice, addInvoice, addInvoiceItem } = require('./purchase-queries.json');
 
-let query = {
+let dummyQuery = {
     name: `Give suitable name here`,
-    text: selectAllItemsFromInvoice,
+    text: `SELECT * FROM customer`,
     values: []
 }
 
-const addPurchaseInvoice = async ({ body }, res) => {
+//#DONE
+const addInvoice = async ({ body }, res) => {
     try {
-        let invoiceInsertQuery = {
+        let query = {
             name: `inserting into invoice`,
-            text: addInvoice,
+            text: `INSERT INTO invoice (date, total_price) VALUES ($1, $2) RETURNING invoice_id;`,
             values: [body.invoice.date, body.invoice.total_price]
         }
-        const invoiceInsertQueryResult = await executeDBQuery(invoiceInsertQuery);
-        console.log(invoiceInsertQueryResult.rows[0].invoice_id);
-        await processItems(body.invoice.items, body.invoice.date, invoiceInsertQueryResult.rows[0].invoice_id);
-        return res.status(201).json({ success: true, data: invoiceInsertQueryResult.rows });
+        const queryResult = await executeDBQuery(query);
+        await addInvoiceItems(body.invoice.items, body.invoice.date, queryResult.rows[0].invoice_id);
+        return res.status(201).json({ success: true, data: queryResult.rows });
         //#TOASK: What would be a proper return here? Info about the succeess of all individual query responses or just the main one?
     }
     catch (error) {
@@ -25,9 +24,9 @@ const addPurchaseInvoice = async ({ body }, res) => {
     }
 }
 
-const editPurchaseInvoice = async (req, res) => {
+const editInvoice = async (req, res) => {
     try {
-        const queryResult = executeDBQuery(selectAllItemsFromInvoice);
+        const queryResult = executeDBQuery(dummyQuery);
         return res.status(201).json({ success: true, data: queryResult })
     }
     catch (error) {
@@ -35,22 +34,136 @@ const editPurchaseInvoice = async (req, res) => {
     }
 }
 
-//#TOASK: Soft Delete?
-const deletePurchaseInvoice = async (req, res) => {
+//#DONE
+const deleteInvoice = async (req, res) => {
+    let { id: invoiceID } = req.params;
     try {
-        const queryResult = executeDBQuery(selectAllItemsFromInvoice);
-        return res.status(201).json({ success: true, data: queryResult })
+        //#region Check if Invoice with ID given exists
+        let checkIfInvoiceExists = {
+            name: `Check if invoice with ID: ${invoiceID}`,
+            text: `SELECT EXISTS (SELECT 1 FROM invoice WHERE invoice_id = $1);`,
+            values: [invoiceID]
+        }
+        const checkInvoiceExistsResult = await executeDBQuery(checkIfInvoiceExists);
+        const doesInvoiceExist = checkInvoiceExistsResult.rows[0].exists;
+        if (!doesInvoiceExist) {
+            return res.status(201).json({
+                success: false,
+                message: `Invoice with ID ${invoiceID} DNE`
+            });
+        }
+        //#endregion
+
+        //Deleting invoice Items
+        let deleteInvoiceItems = {
+            name: `Delete all invoiceItems with invoiceID: ${invoiceID}`,
+            text: `DELETE FROM invoice_item WHERE invoice_id = $1;`,
+            values: [invoiceID]
+        }
+        const deleteInvoiceItemsResult = await executeDBQuery(deleteInvoiceItems);
+
+        //Deleting invoice
+        let deleteInvoice = {
+            name: `Delete invoice with ID: ${invoiceID}`,
+            text: `DELETE FROM invoice WHERE invoice_id = $1;`,
+            values: [invoiceID]
+        }
+        const deleteInvoiceResult = await executeDBQuery(deleteInvoice);
+
+        return res.status(201).json({
+            success: true
+        })
+        //#TOASK: A proper thing to return here?
     }
     catch (error) {
         return res.status(500).json({ success: false, msg: error.message });
     }
 }
 
-//#TOASK: Add Pagination later? 
+//#DONE
+const deleteInvoiceItem = async (req, res) => {
+    let { id: invoiceItemID } = req.params;
+    try {
+        //#region Checking if Invoice_Item to be deleted exists
+        let checkIfInvoiceItemExists = {
+            name: `Check if invoice_item with ID: ${invoiceItemID}`,
+            text: `SELECT EXISTS (SELECT 1 FROM invoice_item WHERE invoice_item_id = $1);`,
+            values: [invoiceItemID]
+        }
+        const checkIfInvoiceItemExistsResult = await executeDBQuery(checkIfInvoiceItemExists);
+        const doesInvoiceItemExist = checkIfInvoiceItemExistsResult.rows[0].exists;
+        if (!doesInvoiceItemExist) {
+            return res.status(201).json({
+                success: false,
+                message: `invoice_item with ID ${invoiceID} DNE`
+            });
+        }
+        //#endregion
+
+        //#region Getting invoice from which this invoiceItem came from
+        let getInvoice = {
+            name: `Get Invoice ID of invoiceItem with ID: ${invoiceItemID}`,
+            text: `SELECT invoice_id, sub_total_price FROM invoice_item WHERE invoice_item_id = $1;`,
+            values: [invoiceItemID]
+        }
+        const getInvoiceResult = await executeDBQuery(getInvoice);
+        const invoiceIDAndSubtotal = getInvoiceResult.rows[0];
+        //#endregion
+
+        //#region Deleting the invoice_item and updating total_price of invoice
+        //Deleting invoice_item
+        let deleteInvoiceItem = {
+            name: `Delete invoiceItem with ID: ${invoiceItemID}`,
+            text: `DELETE FROM invoice_item WHERE invoice_item_id = $1`,
+            values: [invoiceItemID]
+        }
+        const deleteInvoiceItemResult = await executeDBQuery(deleteInvoiceItem);
+
+        //Update invoice by decreasing total price
+        let updateInvoice = {
+            name: `Update invoice with ID: ${invoiceIDAndSubtotal.invoice_id}`,
+            text: `UPDATE invoice SET total_price = total_price - $1 WHERE invoice_id = $2`,
+            values: [invoiceIDAndSubtotal.sub_total_price, invoiceIDAndSubtotal.invoice_id]
+        }
+        const updateInvoiceResult = await executeDBQuery(updateInvoice);
+        //#endregion
+
+        return res.status(201).json({
+            success: true
+        })
+        //#TOASK: A proper thing to return here?
+    }
+    catch (error) {
+        return res.status(500).json({ success: false, msg: error.message });
+    }
+}
+
+//#DONE
 const listAllInvoices = async (req, res) => {
     try {
-        const queryResult = executeDBQuery(selectAllItemsFromInvoice);
-        return res.status(201).json({ success: true, data: queryResult })
+        let listAllInvoices = {
+            name: `List all invoices`,
+            text: `SELECT * FROM invoice`,
+        }
+        const queryResult = await executeDBQuery(listAllInvoices);
+        return res.status(201).json({ success: true, data: queryResult.rows })
+    }
+    catch (error) {
+        return res.status(500).json({ success: false, msg: error.message });
+    }
+}
+
+//#DONE
+const listInvoiceItems = async (req, res) => {
+    let { id: invoiceID } = req.params;
+    try {
+        let listInvoiceItems = {
+            name: `List all invoice_items belonging to invoice with ID ${invoiceID}`,
+            text: `SELECT * FROM invoice_item WHERE invoice_id = $1`,
+            values: [invoiceID]
+        }
+        const queryResult = await executeDBQuery(listInvoiceItems);
+        return res.status(201).json({ success: true, data: queryResult.rows })
     }
     catch (error) {
         return res.status(500).json({ success: false, msg: error.message });
@@ -58,16 +171,16 @@ const listAllInvoices = async (req, res) => {
 }
 
 //#region Helper Functions
-const processItems = async (items, date, invoice_id) => {
+const addInvoiceItems = async (items, date, invoice_id) => {
     for (const item of items) {
-        let insertInvoiceItemQuery = {
+        let query = {
             name: `inserting int inovice_item`,
-            text: addInvoiceItem,
+            text: `INSERT INTO invoice_item (invoice_id, date, product_id, quantity, unit_price, sub_total_price) VALUES ($1, $2, $3, $4, $5, $6);`,
             values: [invoice_id, date, item.product_id, item.quantity, item.unit_price, item.sub_total_price]
         }
-        await executeDBQuery(insertInvoiceItemQuery);
+        await executeDBQuery(query);
     }
 }
 //#endregion
 
-module.exports = { addPurchaseInvoice, editPurchaseInvoice, listAllInvoices, deletePurchaseInvoice }
+module.exports = { addInvoice, editInvoice, listAllInvoices, deleteInvoice, deleteInvoiceItem, listInvoiceItems }
