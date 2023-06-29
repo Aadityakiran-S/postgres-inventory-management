@@ -24,10 +24,91 @@ const addInvoice = async ({ body }, res) => {
     }
 }
 
+//#DONE
 const editInvoice = async (req, res) => {
+    let { id: invoiceID } = req.params;
+    let body = req.body.invoice;
     try {
-        const queryResult = executeDBQuery(dummyQuery);
-        return res.status(201).json({ success: true, data: queryResult })
+        //#region Check if Invoice with ID given exists
+        let checkIfInvoiceExists = {
+            name: `Check if invoice with ID: ${invoiceID}`,
+            text: `SELECT EXISTS (SELECT 1 FROM invoice WHERE invoice_id = $1);`,
+            values: [invoiceID]
+        }
+        const checkInvoiceExistsResult = await executeDBQuery(checkIfInvoiceExists);
+        const doesInvoiceExist = checkInvoiceExistsResult.rows[0].exists;
+        if (!doesInvoiceExist) {
+            return res.status(201).json({
+                success: false,
+                message: `Invoice with ID ${invoiceID} DNE`
+            });
+        }
+        //#endregion
+
+        //Updating invoice
+        let updateInvoice = {
+            name: `Update invoice entry with invoiceID: ${invoiceID}`,
+            text: `UPDATE invoice SET date = $1 WHERE invoice_id = $2;`,
+            values: [body.date, invoiceID] //Add new fileds here later
+        }
+        const queryResult = await executeDBQuery(updateInvoice)
+        return res.status(201).json({ success: true, data: queryResult.rows[0] })
+    }
+    catch (error) {
+        return res.status(500).json({ success: false, msg: error.message });
+    }
+}
+
+const editInvoiceItem = async (req, res) => {
+    let { id: invoiceItemID } = req.params;
+    let body = req.body.invoiceItem;
+    try {
+        //#region Check if Invoice with ID given exists
+        let checkInvoiceItemExists = {
+            name: `Check if invoice_item with ID: ${invoiceItemID}`,
+            text: `SELECT EXISTS (SELECT 1 FROM invoice_item WHERE invoice_item_id = $1);`,
+            values: [invoiceItemID]
+        }
+        const checkInvoiceItemExistsRes = await executeDBQuery(checkInvoiceItemExists);
+        const doesInvoiceExist = checkInvoiceItemExistsRes.rows[0].exists;
+        if (!doesInvoiceExist) {
+            return res.status(201).json({
+                success: false,
+                message: `Invoice_item with ID ${invoiceItemID} DNE`
+            });
+        }
+        //#endregion
+
+        //Get current invoice_item
+        let getInvoiceItem = {
+            name: `Get inovice_item with Inovice_item_id: ${invoiceItemID}`,
+            text: `SELECT invoice_id, sub_total_price FROM invoice_item WHERE invoice_item_id = $1;`,
+            values: [invoiceItemID] //Add new fileds here later
+        }
+        const getInvoiceItemResult = await executeDBQuery(getInvoiceItem);
+        const currentInvoiceItem = getInvoiceItemResult.rows[0];
+
+        //Update in parent invoice if there's a change in price
+        if (currentInvoiceItem.sub_total_price != body.sub_total_price) {
+            console.log(currentInvoiceItem.invoice_id);
+            let updateInvoice = {
+                name: `Update invoice with invoice_id: ${currentInvoiceItem.invoice_id}`,
+                text: `UPDATE invoice SET total_price = total_price + $1 WHERE invoice_id = $2;`,
+                values: [body.sub_total_price - currentInvoiceItem.sub_total_price, currentInvoiceItem.invoice_id]
+            }
+            const updateInvoiceResult = await executeDBQuery(updateInvoice);
+            console.log(body.sub_total_price - currentInvoiceItem.sub_total_price);
+        }
+
+        //Update current InvoiceItem
+        let updateInvoiceItem = {
+            name: `Update inovice_item with Inovice_item_id: ${invoiceItemID}`,
+            text: `UPDATE invoice_item SET product_id = $1, unit_price = $2, 
+            quantity = $3, sub_total_price = $4 WHERE invoice_item_id = $5;`,
+            values: [body.product_id, body.unit_price, body.quantity, body.sub_total_price, invoiceItemID] //Add new fileds here later
+        }
+        const updateInvoiceItemResult = await executeDBQuery(updateInvoiceItem);
+        return res.status(201).json({ success: true, data: updateInvoiceItemResult.rows[0] });
     }
     catch (error) {
         return res.status(500).json({ success: false, msg: error.message });
@@ -183,4 +264,9 @@ const addInvoiceItems = async (items, date, invoice_id) => {
 }
 //#endregion
 
-module.exports = { addInvoice, editInvoice, listAllInvoices, deleteInvoice, deleteInvoiceItem, listInvoiceItems }
+module.exports = {
+    addInvoice,
+    editInvoice, editInvoiceItem,
+    listAllInvoices, listInvoiceItems,
+    deleteInvoice, deleteInvoiceItem
+}
