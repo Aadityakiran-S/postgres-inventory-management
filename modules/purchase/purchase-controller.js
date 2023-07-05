@@ -93,7 +93,7 @@ const editInvoiceItem = async (req, res) => {
             console.log(body.sub_total_price - currentInvoiceItem.sub_total_price);
         }
 
-        //#TODO: Update the product_id if there's a change in name
+        //#TOASK: Update the product_id if there's a change in name
 
         //Update current InvoiceItem
         let updateInvoiceItem = {
@@ -246,7 +246,6 @@ const listInvoiceItems = async (req, res) => {
 
 //#region Helper Functions
 const addInvoiceItems = async (items, date, invoice_id) => {
-    //#TODO: Implement the below things
     for (const item of items) {
         const p_id = await retrieveProductID(item.product_name);
         item.product_id = p_id; //Adding product_id filed
