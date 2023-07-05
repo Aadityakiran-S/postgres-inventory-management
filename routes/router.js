@@ -8,7 +8,7 @@ const {
 } = require('../modules/purchase/purchase-controller');
 
 //For now, putting all purchase routes here. Can move to it's own folder if it gets too crowded
-router.route('/').post(addInvoice); //#TOASK: Should we enable an option to POST invoice_item only as well?
+router.route('/').post(addInvoice);
 
 router.route('/invoice').get(listAllInvoices);
 router.route('/invoice_item/:id').get(listInvoiceItems);

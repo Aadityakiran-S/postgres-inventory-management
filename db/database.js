@@ -1,15 +1,6 @@
 const { Pool, Client } = require('pg');
 require('dotenv').config();
 
-//#TOASK: This is not working for some reason. When I checked the internet, I found that using database pooling would solve the issue and it did.
-// const client = new Client({
-//     host: process.env.DB_HOST,
-//     port: process.env.DB_PORT,
-//     user: process.env.DB_USER,
-//     password: `${process.env.DB_PASSWORD}`,
-//     database: process.env.DB_NAME
-// });
-
 const client = new Pool({
     host: process.env.DB_HOST,
     port: process.env.DB_PORT,

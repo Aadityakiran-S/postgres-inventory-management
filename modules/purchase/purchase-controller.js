@@ -1,11 +1,5 @@
 const executeDBQuery = require('../../helpers/query-execution-helper.js');
 
-let dummyQuery = {
-    name: `Give suitable name here`,
-    text: `SELECT * FROM customer`,
-    values: []
-}
-
 //#DONE
 const addInvoice = async ({ body }, res) => {
     try {
@@ -16,8 +10,7 @@ const addInvoice = async ({ body }, res) => {
         }
         const queryResult = await executeDBQuery(query);
         await addInvoiceItems(body.invoice.items, body.invoice.date, queryResult.rows[0].invoice_id);
-        return res.status(201).json({ success: true, data: queryResult.rows });
-        //#TOASK: What would be a proper return here? Info about the succeess of all individual query responses or just the main one?
+        return res.status(201).json({ success: true, data: queryResult.rows[0] });
     }
     catch (error) {
         return res.status(500).json({ success: false, msg: error.message });
@@ -63,7 +56,7 @@ const editInvoiceItem = async (req, res) => {
     let { id: invoiceItemID } = req.params;
     let body = req.body.invoiceItem;
     try {
-        //#region Check if Invoice with ID given exists
+        //#region Check if InvoiceItem with ID given exists
         let checkInvoiceItemExists = {
             name: `Check if invoice_item with ID: ${invoiceItemID}`,
             text: `SELECT EXISTS (SELECT 1 FROM invoice_item WHERE invoice_item_id = $1);`,
@@ -99,6 +92,8 @@ const editInvoiceItem = async (req, res) => {
             const updateInvoiceResult = await executeDBQuery(updateInvoice);
             console.log(body.sub_total_price - currentInvoiceItem.sub_total_price);
         }
+
+        //#TODO: Update the product_id if there's a change in name
 
         //Update current InvoiceItem
         let updateInvoiceItem = {
@@ -154,7 +149,6 @@ const deleteInvoice = async (req, res) => {
         return res.status(201).json({
             success: true
         })
-        //#TOASK: A proper thing to return here?
     }
     catch (error) {
         return res.status(500).json({ success: false, msg: error.message });
@@ -212,7 +206,6 @@ const deleteInvoiceItem = async (req, res) => {
         return res.status(201).json({
             success: true
         })
-        //#TOASK: A proper thing to return here?
     }
     catch (error) {
         return res.status(500).json({ success: false, msg: error.message });
@@ -253,6 +246,12 @@ const listInvoiceItems = async (req, res) => {
 
 //#region Helper Functions
 const addInvoiceItems = async (items, date, invoice_id) => {
+    //#TODO: Implement the below things
+    for (const item of items) {
+        const p_id = await retrieveProductID(item.product_name);
+        item.product_id = p_id; //Adding product_id filed
+    }
+    console.log("Hello");
     for (const item of items) {
         let query = {
             name: `inserting int inovice_item`,
@@ -261,6 +260,37 @@ const addInvoiceItems = async (items, date, invoice_id) => {
         }
         await executeDBQuery(query);
     }
+}
+
+const retrieveProductID = async (product_name) => {
+    //#region Checking if product with given name exists
+    let query = {
+        name: `Checking if product with given name exists`,
+        text: `SELECT EXISTS (SELECT 1 FROM product WHERE product_name = $1);`,
+        values: [product_name]
+    }
+    const queryResult = await executeDBQuery(query);
+    //#endregion
+
+    const doesInvoiceItemExist = queryResult.rows[0].exists; let prdQueryRes;
+    if (!doesInvoiceItemExist) {
+        //Create one
+        let query = {
+            name: `Creating a product with the given name in product table`,
+            text: `INSERT INTO product (product_name) VALUES ($1) RETURNING product_id;`,
+            values: [product_name]
+        }
+        prdQueryRes = await executeDBQuery(query);
+    } else {
+        //Get it's ID
+        let query = {
+            name: `Getting ID of already existing product`,
+            text: `SELECT product_id FROM product WHERE product_name = $1;`,
+            values: [product_name]
+        }
+        prdQueryRes = await executeDBQuery(query);
+    }
+    return prdQueryRes.rows[0].product_id;
 }
 //#endregion
 
