@@ -10,7 +10,7 @@ const {
 } = require('../modules/invoice/invoice-apis');
 
 //APIs
-router.route('/').post(addInvoice);
+router.route('/invoice').post(addInvoice);
 
 router.route('/invoice').get(listAllInvoices);
 router.route('/invoice_item/:id').get(listInvoiceItems);

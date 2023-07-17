@@ -3,12 +3,17 @@ const executeDBQuery = require('../../helpers/query-execution-helper.js');
 //#region  CRUD on invoice
 const addInvoice = async ({ body }, res) => {
     try {
+        //Check if supplier with given name exists. if not, then add that to supplier table
+        const s_id = await checkSupplierNameExists(body.supplier_name);
+        body.invoice.supplier_id = s_id;
         let query = {
             name: `inserting into invoice`,
-            text: `INSERT INTO invoice (date, total_price) VALUES ($1, $2) RETURNING invoice_id;`,
-            values: [body.invoice.date, body.invoice.total_price]
+            text: `INSERT INTO invoice (date, total_price, supplier_id) VALUES ($1, $2, $3) RETURNING invoice_id;`,
+            values: [body.invoice.date, body.invoice.total_price, body.invoice.supplier_id]
         }
         const queryResult = await executeDBQuery(query);
+        //Add supplier-product mapping for every new supplier-product combo
+        await createSupplierProductMapping(body.invoice.items, s_id);
         await addInvoiceItems(body.invoice.items, body.invoice.date, queryResult.rows[0].invoice_id);
         return res.status(201).json({ success: true, data: queryResult.rows[0] });
     }
@@ -246,7 +251,6 @@ const addInvoiceItems = async (items, date, invoice_id) => {
         const p_id = await retrieveProductID(item.product_name);
         item.product_id = p_id; //Adding product_id filed
     }
-    console.log("Hello");
     for (const item of items) {
         let query = {
             name: `inserting int inovice_item`,
@@ -286,6 +290,56 @@ const retrieveProductID = async (product_name) => {
         prdQueryRes = await executeDBQuery(query);
     }
     return prdQueryRes.rows[0].product_id;
+}
+
+const checkSupplierNameExists = async (supplierName) => {
+    //Checking if supplier with given name exists
+    let query = {
+        name: `Checking if supplier with given name exists`,
+        text: `SELECT EXISTS (SELECT 1 FROM supplier WHERE supplier_name = $1);`,
+        values: [supplierName]
+    }
+    const res1 = await executeDBQuery(query); var supplierID;
+    if (res1.rows[0].exists) { //If exists, return that's supplier ID
+        let query = {
+            name: `Getting ID of the given supplier`,
+            text: `SELECT suppier_id FROM supplier WHERE supplier_name = $1;`,
+            values: [supplierName]
+        }
+        const res2 = await executeDBQuery(query);
+        supplierID = res2.rows[0].supplier_id;
+    } else { //Else, create one and return newly created supplierID
+        let query = {
+            name: `Creating a new supplier with given name and returning its ID`,
+            text: `INSERT INTO supplier (supplier_name) VALUES ($1) RETURNING supplier_id;`,
+            values: [supplierName]
+        }
+        console.log("executing supplier entry query");
+        const res2 = await executeDBQuery(query);
+        supplierID = res2.rows[0].supplier_id;
+    }
+    return supplierID;
+}
+
+const createSupplierProductMapping = async (items, s_id) => {
+    for (const item of items) {
+        //Checking S-P mapping if exists
+        let query = {
+            name: `Checking if supplier-product mapping exists`,
+            text: `SELECT EXISTS (SELECT 1 FROM supplier-product WHERE supplier_id = $1 AND product_id = $2);`,
+            values: [s_id, item.product_id]
+        }
+        const res1 = await executeDBQuery(query);
+        //If exists, leave alone, if not we need to create a new mapping
+        if (!res1.rows[0].exists) {
+            let query = {
+                name: `Creating new supplier-product mapping`,
+                text: `INSERT INTO supplier_product (supplier_id, product_id) VALUES ($1, $2);`,
+                values: [s_id, item.product_id]
+            }
+            const res2 = await executeDBQuery(query);
+        }
+    }
 }
 //#endregion
 
