@@ -1,6 +1,6 @@
 const executeDBQuery = require('../../helpers/query-execution-helper.js');
 
-//#DONE
+//#region  CRUD on invoice
 const addInvoice = async ({ body }, res) => {
     try {
         let query = {
@@ -17,7 +17,6 @@ const addInvoice = async ({ body }, res) => {
     }
 }
 
-//#DONE
 const editInvoice = async (req, res) => {
     let { id: invoiceID } = req.params;
     let body = req.body.invoice;
@@ -110,7 +109,6 @@ const editInvoiceItem = async (req, res) => {
     }
 }
 
-//#DONE
 const deleteInvoice = async (req, res) => {
     let { id: invoiceID } = req.params;
     try {
@@ -155,7 +153,6 @@ const deleteInvoice = async (req, res) => {
     }
 }
 
-//#DONE
 const deleteInvoiceItem = async (req, res) => {
     let { id: invoiceItemID } = req.params;
     try {
@@ -212,7 +209,6 @@ const deleteInvoiceItem = async (req, res) => {
     }
 }
 
-//#DONE
 const listAllInvoices = async (req, res) => {
     try {
         let listAllInvoices = {
@@ -227,7 +223,6 @@ const listAllInvoices = async (req, res) => {
     }
 }
 
-//#DONE
 const listInvoiceItems = async (req, res) => {
     let { id: invoiceID } = req.params;
     try {
@@ -243,6 +238,7 @@ const listInvoiceItems = async (req, res) => {
         return res.status(500).json({ success: false, msg: error.message });
     }
 }
+//#endregion
 
 //#region Helper Functions
 const addInvoiceItems = async (items, date, invoice_id) => {
