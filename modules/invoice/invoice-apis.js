@@ -4,7 +4,7 @@ const executeDBQuery = require('../../helpers/query-execution-helper.js');
 const addInvoice = async ({ body }, res) => {
     try {
         //Check if supplier with given name exists. if not, then add that to supplier table
-        const s_id = await checkSupplierNameExists(body.supplier_name);
+        const s_id = await checkSupplierNameExists(body.invoice.supplier_name);
         body.invoice.supplier_id = s_id;
         let query = {
             name: `inserting into invoice`,
@@ -12,9 +12,10 @@ const addInvoice = async ({ body }, res) => {
             values: [body.invoice.date, body.invoice.total_price, body.invoice.supplier_id]
         }
         const queryResult = await executeDBQuery(query);
-        //Add supplier-product mapping for every new supplier-product combo
-        await createSupplierProductMapping(body.invoice.items, s_id);
         await addInvoiceItems(body.invoice.items, body.invoice.date, queryResult.rows[0].invoice_id);
+        //Add supplier_product mapping for every new supplier_product combo
+        await createSupplierProductMapping(body.invoice.items, s_id);
+
         return res.status(201).json({ success: true, data: queryResult.rows[0] });
     }
     catch (error) {
@@ -303,7 +304,7 @@ const checkSupplierNameExists = async (supplierName) => {
     if (res1.rows[0].exists) { //If exists, return that's supplier ID
         let query = {
             name: `Getting ID of the given supplier`,
-            text: `SELECT suppier_id FROM supplier WHERE supplier_name = $1;`,
+            text: `SELECT supplier_id FROM supplier WHERE supplier_name = $1;`,
             values: [supplierName]
         }
         const res2 = await executeDBQuery(query);
@@ -314,26 +315,29 @@ const checkSupplierNameExists = async (supplierName) => {
             text: `INSERT INTO supplier (supplier_name) VALUES ($1) RETURNING supplier_id;`,
             values: [supplierName]
         }
-        console.log("executing supplier entry query");
         const res2 = await executeDBQuery(query);
         supplierID = res2.rows[0].supplier_id;
     }
     return supplierID;
 }
 
+//#TOASK: If suppose some queries don't work out, we should prevent any spurious data from entering our table right? How do we do that?
+
+//#TOASK: After deleting entries and all, the IDs are incrementing on their own. Is there any way to stop that?
+
 const createSupplierProductMapping = async (items, s_id) => {
     for (const item of items) {
         //Checking S-P mapping if exists
         let query = {
-            name: `Checking if supplier-product mapping exists`,
-            text: `SELECT EXISTS (SELECT 1 FROM supplier-product WHERE supplier_id = $1 AND product_id = $2);`,
+            name: `Checking if supplier_product mapping exists`,
+            text: `SELECT EXISTS (SELECT 1 FROM supplier_product WHERE supplier_id = $1 AND product_id = $2);`,
             values: [s_id, item.product_id]
         }
         const res1 = await executeDBQuery(query);
         //If exists, leave alone, if not we need to create a new mapping
         if (!res1.rows[0].exists) {
             let query = {
-                name: `Creating new supplier-product mapping`,
+                name: `Creating new supplier_product mapping`,
                 text: `INSERT INTO supplier_product (supplier_id, product_id) VALUES ($1, $2);`,
                 values: [s_id, item.product_id]
             }

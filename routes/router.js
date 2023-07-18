@@ -31,4 +31,11 @@ const {
 router.route('/product').get(listAllProducts);
 //#endregion
 
+//#region Price Tracking
+const { findMinPriceBtweenTwoDates } = require('../modules/price-tracking/price-tracking-apis');
+
+//APIs
+router.route('/price_tracking').get(findMinPriceBtweenTwoDates);
+//#endregion
+
 module.exports = router;

@@ -38,4 +38,4 @@ const findMinPriceBtweenTwoDates = async (productName, supplierName, customerID,
     }
 }
 
-modules.export = {}
+module.exports = { findMinPriceBtweenTwoDates }
