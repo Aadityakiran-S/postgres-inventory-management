@@ -30,4 +30,8 @@ const listProductsBySupplier = async (req, res) => {
     }
 }
 
+const listAllProductsByCustomer = async (req, res) => {
+
+}
+
 module.exports = { listAllProducts, listProductsBySupplier }

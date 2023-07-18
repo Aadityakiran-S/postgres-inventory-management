@@ -2,17 +2,21 @@ const executeDBQuery = require('../../helpers/query-execution-helper.js');
 
 //#region  CRUD on invoice
 const addInvoice = async ({ body }, res) => {
+    const customer_id = 1;
     try {
         //Check if supplier with given name exists. if not, then add that to supplier table
         const s_id = await checkSupplierNameExists(body.invoice.supplier_name);
         body.invoice.supplier_id = s_id;
+
+        //Adding invoice
         let query = {
             name: `inserting into invoice`,
-            text: `INSERT INTO invoice (date, total_price, supplier_id) VALUES ($1, $2, $3) RETURNING invoice_id;`,
-            values: [body.invoice.date, body.invoice.total_price, body.invoice.supplier_id]
+            text: `INSERT INTO invoice (date, total_price, supplier_id, customer_id) VALUES ($1, $2, $3, $4) RETURNING invoice_id;`,
+            values: [body.invoice.date, body.invoice.total_price, body.invoice.supplier_id, customer_id]
         }
         const queryResult = await executeDBQuery(query);
-        await addInvoiceItems(body.invoice.items, body.invoice.date, queryResult.rows[0].invoice_id);
+
+        await addInvoiceItemsAndUpdateProductStock(body.invoice.items, body.invoice.date, queryResult.rows[0].invoice_id, s_id, customer_id);
         //Add supplier_product mapping for every new supplier_product combo
         await createSupplierProductMapping(body.invoice.items, s_id);
 
@@ -247,18 +251,57 @@ const listInvoiceItems = async (req, res) => {
 //#endregion
 
 //#region Helper Functions
-const addInvoiceItems = async (items, date, invoice_id) => {
+const addInvoiceItemsAndUpdateProductStock = async (items, date, invoice_id, supplier_id, customer_id) => {
     for (const item of items) {
+        //Getting product_id from product_name: IF product not listed, listing it
         const p_id = await retrieveProductID(item.product_name);
         item.product_id = p_id; //Adding product_id filed
-    }
-    for (const item of items) {
-        let query = {
+
+        //Adding invoice items
+        let query1 = {
             name: `inserting int inovice_item`,
-            text: `INSERT INTO invoice_item (invoice_id, date, product_id, quantity, unit_price, sub_total_price) VALUES ($1, $2, $3, $4, $5, $6);`,
-            values: [invoice_id, date, item.product_id, item.quantity, item.unit_price, item.sub_total_price]
+            text: `INSERT INTO invoice_item (invoice_id, date, product_id, quantity, unit_price, sub_total_price, supplier_id, customer_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING invoice_item_id;`,
+            values: [invoice_id, date, p_id, item.quantity, item.unit_price, item.sub_total_price, supplier_id, customer_id]
         }
-        await executeDBQuery(query);
+        var res1 = await executeDBQuery(query1);
+
+        //TODO: Add to product_stock table
+        await updateProductStockTable(item, p_id, customer_id, supplier_id, date, res1.rows[0].invoice_item_id);
+    }
+}
+
+const updateProductStockTable = async (item, product_id, customer_id, supplier_id, date, invoice_item_id) => {
+    //Checking if entry exists with given product_id and customer_id
+    let query1 = {
+        name: `Checking if entry exists with given product_id and customer_id`,
+        text: `SELECT EXISTS (SELECT 1 FROM product_stock WHERE product_id = $1 AND customer_id = $2);`,
+        values: [product_id, customer_id]
+    }
+    var res1 = await executeDBQuery(query1);
+
+    //If stock entry exists, simply add the value of quantity for each item
+    if (res1.rows[0].exists) {
+        let query2 = {
+            name: `Updating product stock for given product_id and customer_id`,
+            text: `UPDATE product_stock 
+            SET 
+            current_quantity = current_quantity + $1,
+            supplier_id = $2,
+            date = $3,
+            invoice_item_id = $4
+            WHERE product_id = $5 AND customer_id = $6;`,
+            values: [item.quantity, supplier_id, date, invoice_item_id, product_id, customer_id]
+        }
+        var res2 = await executeDBQuery(query2);
+    } else { //If not, create and set intial value of stock to what item has at this point
+        let query3 = {
+            name: `Creating a new product_stock table entry`,
+            text: `INSERT INTO product_stock
+            (product_id, customer_id, supplier_id, current_quantity, invoice_item_id, date) 
+            VALUES ($1, $2, $3, $4, $5, $6);`,
+            values: [product_id, customer_id, supplier_id, item.quantity, invoice_item_id, date]
+        }
+        var res3 = await executeDBQuery(query3);
     }
 }
 
@@ -321,10 +364,6 @@ const checkSupplierNameExists = async (supplierName) => {
     return supplierID;
 }
 
-//#TOASK: If suppose some queries don't work out, we should prevent any spurious data from entering our table right? How do we do that?
-
-//#TOASK: After deleting entries and all, the IDs are incrementing on their own. Is there any way to stop that?
-
 const createSupplierProductMapping = async (items, s_id) => {
     for (const item of items) {
         //Checking S-P mapping if exists
@@ -345,6 +384,10 @@ const createSupplierProductMapping = async (items, s_id) => {
         }
     }
 }
+
+//#TOASK: If suppose some queries don't work out, we should prevent any spurious data from entering our table right? How do we do that?
+
+//#TOASK: After deleting entries and all, the IDs are incrementing on their own. Is there any way to stop that?
 //#endregion
 
 module.exports = {
