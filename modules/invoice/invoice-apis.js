@@ -2,7 +2,7 @@ const executeDBQuery = require('../../helpers/query-execution-helper.js');
 
 //#region  CRUD on invoice
 const addInvoice = async ({ body }, res) => {
-    const customer_id = 1;
+    const customer_id = 1; //#ALERT c_id given here because it's always known?
     try {
         //Check if supplier with given name exists. if not, then add that to supplier table
         const s_id = await checkSupplierNameExists(body.invoice.supplier_name);

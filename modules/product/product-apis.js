@@ -72,25 +72,40 @@ const listAllProductsByCustomer = async (req, res) => {
     }
 }
 
-const listAllProductsBySupplierAndCustomer = async (req, res) => {
-    /*
-    List all products that a Customer has bought from a particular Supplier: This one is a little tricky.The solution would be as follows.
-
-    * Take the Invoice-Item table (between 2 dates since this query has to be like that to prevent an entire table scan).
-
-    * Select for a given supplier_id and customer_id.
-
-    * Join on the Product Table where product_id is the same in both to get product_name[s].
-   */
-    let { id: s_id } = req.params;
+const listAllProductsByCustomerAndSupplier = async (req, res) => {
+    let { supplier_id: s_id, start_date, end_date } = req.body;
+    let c_id = 1; //#ALERT c_id given here because it's always known?
     try {
-        let listAllProductsBySupplier = {
-            name: `List all products by supplier`,
-            text: `SELECT product_stock.product_id, product.product_name FROM product_stock
-            JOIN product ON product_stock.product_id = product.product_id WHERE product_stock.customer_id = 'your_customer_id' AND product_stock.supplier_id = 'your_supplier_id' AND product_stock.date BETWEEN 'start_date' AND 'end_date';`,
+        //#region Error Check
+        //Checking if supplier with given id exists
+        let query1 = {
+            name: `Checking if supplier with given id exists`,
+            text: `SELECT EXISTS (SELECT 1 FROM supplier WHERE supplier_id = $1);`,
             values: [s_id]
         }
-        const queryResult = await executeDBQuery(listAllProductsBySupplier);
+        const res1 = await executeDBQuery(query1);
+        if (!res1.rows[0].exists) {
+            return res.status(500).json({ success: false, msg: `Supplier with ID ${s_id} DNE` });
+        }
+        //Checking if customer with given id exists
+        let query2 = {
+            name: `Checking if customer with given id exists`,
+            text: `SELECT EXISTS (SELECT 1 FROM customer WHERE customer_id = $1);`,
+            values: [c_id]
+        }
+        const res2 = await executeDBQuery(query2);
+        if (!res2.rows[0].exists) {
+            return res.status(500).json({ success: false, msg: `Customer with ID ${c_id} DNE` });
+        }
+        //#endregion
+
+        let listAllProductsBySupplierAndCustomer = {
+            name: `List all products by customer and supplier`,
+            text: `SELECT product_stock.product_id, product.product_name FROM product_stock
+            JOIN product ON product_stock.product_id = product.product_id WHERE product_stock.customer_id = $1 AND product_stock.supplier_id = $2 AND product_stock.date BETWEEN $3 AND $4;`,
+            values: [c_id, s_id, start_date, end_date]
+        }
+        const queryResult = await executeDBQuery(listAllProductsBySupplierAndCustomer);
         return res.status(201).json({ success: true, data: queryResult.rows })
     }
     catch (error) {
@@ -98,4 +113,4 @@ const listAllProductsBySupplierAndCustomer = async (req, res) => {
     }
 }
 
-module.exports = { listAllProducts, listProductsBySupplier, listAllProductsByCustomer }
+module.exports = { listAllProducts, listProductsBySupplier, listAllProductsByCustomer, listAllProductsByCustomerAndSupplier }
