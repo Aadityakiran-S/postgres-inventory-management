@@ -24,12 +24,13 @@ router.route('/invoice_item/:id').delete(deleteInvoiceItem);
 
 //#region Product
 const {
-    listAllProducts, listProductsBySupplier
+    listAllProducts, listProductsBySupplier, listAllProductsByCustomer
 } = require('../modules/product/product-apis');
 
 //APIs
 router.route('/product').get(listAllProducts);
-router.route('/product/:id').get(listProductsBySupplier);
+router.route('/product/supplier/:id').get(listProductsBySupplier);
+router.route('/product/customer/:id').get(listAllProductsByCustomer);
 //#endregion
 
 //#region Price Tracking
