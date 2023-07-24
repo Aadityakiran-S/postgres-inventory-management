@@ -101,8 +101,8 @@ const listAllProductsByCustomerAndSupplier = async (req, res) => {
 
         let listAllProductsBySupplierAndCustomer = {
             name: `List all products by customer and supplier`,
-            text: `SELECT product_stock.product_id, product.product_name FROM product_stock
-            JOIN product ON product_stock.product_id = product.product_id WHERE product_stock.customer_id = $1 AND product_stock.supplier_id = $2 AND product_stock.date BETWEEN $3 AND $4;`,
+            text: `SELECT invoice_item.product_id, product.product_name FROM invoice_item
+            JOIN product ON invoice_item.product_id = product.product_id WHERE invoice_item.customer_id = $1 AND invoice_item.supplier_id = $2 AND invoice_item.date BETWEEN $3 AND $4;`,
             values: [c_id, s_id, start_date, end_date]
         }
         const queryResult = await executeDBQuery(listAllProductsBySupplierAndCustomer);
