@@ -20,9 +20,10 @@ const findMinPriceBtweenTwoDates = async (req, res) => {
 
         let query3 = {
             name: `Return min within date range`,
-            text: `SELECT ii.unit_price, ii.invoice_id, ii.date, ii.invoice_item_id, p.product_name
+            text: `SELECT ii.unit_price, ii.date, p.product_name, s.supplier_name
             FROM invoice_item AS ii
             JOIN product AS p ON ii.product_id = p.product_id
+            JOIN supplier AS s ON ii.supplier_id = s.supplier_id
             WHERE ii.product_id = $1 AND ii.customer_id = $2 AND ii.date BETWEEN $3 AND $4
             ORDER BY ii.unit_price ASC 
             LIMIT 1;`,
