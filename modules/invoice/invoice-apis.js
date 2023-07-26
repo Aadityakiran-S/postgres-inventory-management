@@ -2,7 +2,6 @@ const executeDBQuery = require('../../helpers/query-execution-helper.js');
 
 //#region  CRUD on invoice
 const addInvoice = async ({ body }, res) => {
-    const customer_id = 1; //#ALERT c_id given here because it's always known?
     try {
         //Check if supplier with given name exists. if not, then add that to supplier table
         const s_id = await checkSupplierNameExists(body.invoice.supplier_name);
@@ -12,11 +11,11 @@ const addInvoice = async ({ body }, res) => {
         let query = {
             name: `inserting into invoice`,
             text: `INSERT INTO invoice (date, total_price, supplier_id, customer_id) VALUES ($1, $2, $3, $4) RETURNING invoice_id;`,
-            values: [body.invoice.date, body.invoice.total_price, body.invoice.supplier_id, customer_id]
+            values: [body.invoice.date, body.invoice.total_price, body.invoice.supplier_id, body.invoice.customer_id]
         }
         const queryResult = await executeDBQuery(query);
 
-        await addInvoiceItemsAndUpdateProductStock(body.invoice.items, body.invoice.date, queryResult.rows[0].invoice_id, s_id, customer_id);
+        await addInvoiceItemsAndUpdateProductStock(body.invoice.items, body.invoice.date, queryResult.rows[0].invoice_id, s_id, body.invoice.customer_id);
         //Add supplier_product mapping for every new supplier_product combo
         await createSupplierProductMapping(body.invoice.items, s_id);
 
@@ -265,7 +264,7 @@ const addInvoiceItemsAndUpdateProductStock = async (items, date, invoice_id, sup
         }
         var res1 = await executeDBQuery(query1);
 
-        //TODO: Add to product_stock table
+        //Add to product_stock table
         await updateProductStockTable(item, p_id, customer_id, supplier_id, date, res1.rows[0].invoice_item_id);
     }
 }
