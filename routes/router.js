@@ -35,10 +35,10 @@ router.route('/product/customer_supplier').get(listAllProductsByCustomerAndSuppl
 //#endregion
 
 //#region Price Tracking
-const { findMinPriceBtweenTwoDates } = require('../modules/price-tracking/price-tracking-apis');
+const { findMinPriceBetweenTwoDates } = require('../modules/price-tracking/price-tracking-apis');
 
 //APIs
-router.route('/price_tracking').get(findMinPriceBtweenTwoDates);
+router.route('/price_tracking').get(findMinPriceBetweenTwoDates);
 //#endregion
 
 module.exports = router;

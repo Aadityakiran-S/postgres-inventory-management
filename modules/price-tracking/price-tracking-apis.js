@@ -3,7 +3,7 @@ const executeDBQuery = require('../../helpers/query-execution-helper.js');
 //#TODO show supplier_id also in this API
 //#TODO: Create a new API for fuzzy search "rice" where products can be "white rice", "red rice" ...
 
-const findMinPriceBtweenTwoDates = async (req, res) => {
+const findMinPriceBetweenTwoDates = async (req, res) => {
     let { product_id, start_date, end_date, customer_id } = req.body;
     try {
         //#region Checking if product with given name exists
@@ -37,4 +37,4 @@ const findMinPriceBtweenTwoDates = async (req, res) => {
     }
 }
 
-module.exports = { findMinPriceBtweenTwoDates }
+module.exports = { findMinPriceBetweenTwoDates }
