@@ -44,10 +44,7 @@ const findMinPriceBetweenTwoDates = async (req, res) => {
 }
 
 const findMinPriceBetweenTwoDates_FuzzySearch = async (req, res) => {
-    //#TODO: Create a new API for fuzzy search "rice" where products can be "white rice", "red rice" ...
-
     let { product_name, start_date, end_date, customer_id } = req.body;
-    let product_id;
     try {
         //#region Checking if product with given name exists in a fuzzy manner
         let query1 = {
