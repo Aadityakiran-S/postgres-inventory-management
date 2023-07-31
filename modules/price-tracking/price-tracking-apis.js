@@ -1,3 +1,4 @@
+const { query } = require('express');
 const executeDBQuery = require('../../helpers/query-execution-helper.js');
 
 const findMinPriceBetweenTwoDates = async (req, res) => {
@@ -31,7 +32,7 @@ const findMinPriceBetweenTwoDates = async (req, res) => {
             JOIN product AS p ON ii.product_id = p.product_id
             JOIN supplier AS s ON ii.supplier_id = s.supplier_id
             WHERE ii.product_id = $1 AND ii.customer_id = $2 AND ii.date BETWEEN $3 AND $4
-            ORDER BY ii.unit_price ASC 
+            ORDER BY ii.unit_price ASC
             LIMIT 1;`,
             values: [product_id, customer_id, start_date, end_date]
         }
@@ -43,6 +44,7 @@ const findMinPriceBetweenTwoDates = async (req, res) => {
     }
 }
 
+//#TOASK If we don't limit this query, many results will come, is that fine?
 const findMinPriceBetweenTwoDates_FuzzySearch = async (req, res) => {
     let { product_name, start_date, end_date, customer_id } = req.body;
     try {
@@ -57,21 +59,33 @@ const findMinPriceBetweenTwoDates_FuzzySearch = async (req, res) => {
             return res.status(404).json({ success: false, message: `No matches found for ${product_name} in database` });
         }
         //#endregion
-
+        //Collecting product_ids of all matching results to array
         const product_ids = queryResult1.rows.map(item => item.product_id);
-        let query3 = {
-            name: `Return min within date range`,
-            text: `SELECT ii.unit_price, ii.date, p.product_name, s.supplier_name
-                FROM invoice_item AS ii
-                JOIN product AS p ON ii.product_id = p.product_id
-                JOIN supplier AS s ON ii.supplier_id = s.supplier_id
-                WHERE ii.product_id = ANY($1) AND ii.customer_id = $2 AND ii.date BETWEEN $3 AND $4
-                ORDER BY ii.unit_price ASC
-                LIMIT 1;`,
-            values: [product_ids, customer_id, start_date, end_date]
+        let output = [];
+        //Running price tracking query for each of IDs within the array
+        for (let i = 0; i < product_ids.length; i++) {
+            //Demarkating the collection of results of a new product
+            output.push(`Start of new product`);
+
+            let product_id = product_ids[i];
+            let query3 = {
+                name: `Return min within date range`,
+                text: `SELECT ii.unit_price, ii.date, p.product_name, s.supplier_name
+                        FROM invoice_item AS ii
+                        JOIN product AS p ON ii.product_id = p.product_id
+                        JOIN supplier AS s ON ii.supplier_id = s.supplier_id
+                        WHERE ii.product_id IN ($1) AND ii.customer_id = $2 AND ii.date BETWEEN $3 AND $4
+                        ORDER BY ii.unit_price ASC;`,
+                values: [product_id, customer_id, start_date, end_date]
+            }
+            const queryResult3 = await executeDBQuery(query3);
+            //Adding all results to output array
+            queryResult3.rows.forEach(priceTrackingResult => {
+                output.push(priceTrackingResult);
+            });
         }
-        const queryResult3 = await executeDBQuery(query3);
-        return res.status(201).json({ success: true, data: queryResult3.rows });
+        //Showing output in response
+        return res.status(201).json({ success: true, data: output });
     }
     catch (error) {
         return res.status(500).json({ success: false, msg: error.message });
