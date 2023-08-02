@@ -101,8 +101,6 @@ const editInvoiceItem = async (req, res) => {
             console.log(body.sub_total_price - currentInvoiceItem.sub_total_price);
         }
 
-        //#TOASK: Update the product_id if there's a change in name
-
         //Update current InvoiceItem
         let updateInvoiceItem = {
             name: `Update inovice_item with Inovice_item_id: ${invoiceItemID}`,
@@ -383,10 +381,6 @@ const createSupplierProductMapping = async (items, s_id) => {
         }
     }
 }
-
-//#TOASK: If suppose some queries don't work out, we should prevent any spurious data from entering our table right? How do we do that?
-
-//#TOASK: After deleting entries and all, the IDs are incrementing on their own. Is there any way to stop that?
 //#endregion
 
 module.exports = {

@@ -44,7 +44,6 @@ const findMinPriceBetweenTwoDates = async (req, res) => {
     }
 }
 
-//#TOASK If we don't limit this query, many results will come, is that fine?
 const findMinPriceBetweenTwoDates_FuzzySearch = async (req, res) => {
     let { product_name, start_date, end_date, customer_id } = req.body;
     try {
@@ -65,7 +64,7 @@ const findMinPriceBetweenTwoDates_FuzzySearch = async (req, res) => {
         //Running price tracking query for each of IDs within the array
         for (let i = 0; i < product_ids.length; i++) {
             //Demarkating the collection of results of a new product
-            output.push(`Start of new product`);
+            output.push(`################# Start of new product #############`);
 
             let product_id = product_ids[i];
             let query3 = {
