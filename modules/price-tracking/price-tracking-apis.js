@@ -64,7 +64,7 @@ const findMinPriceBetweenTwoDates_FuzzySearch = async (req, res) => {
         //Running price tracking query for each of IDs within the array
         for (let i = 0; i < product_ids.length; i++) {
             //Demarkating the collection of results of a new product
-            output.push(`################# Start of new product #############`);
+            output.push(`################# Start of ${product_ids[i]} #############`);
 
             let product_id = product_ids[i];
             let query3 = {
@@ -74,7 +74,8 @@ const findMinPriceBetweenTwoDates_FuzzySearch = async (req, res) => {
                         JOIN product AS p ON ii.product_id = p.product_id
                         JOIN supplier AS s ON ii.supplier_id = s.supplier_id
                         WHERE ii.product_id IN ($1) AND ii.customer_id = $2 AND ii.date BETWEEN $3 AND $4
-                        ORDER BY ii.unit_price ASC;`,
+                        ORDER BY ii.unit_price ASC
+                        LIMIT 1;`,
                 values: [product_id, customer_id, start_date, end_date]
             }
             const queryResult3 = await executeDBQuery(query3);
@@ -91,4 +92,70 @@ const findMinPriceBetweenTwoDates_FuzzySearch = async (req, res) => {
     }
 }
 
-module.exports = { findMinPriceBetweenTwoDates, findMinPriceBetweenTwoDates_FuzzySearch }
+const customerProductPriceTracking = async (req, res) => {
+    /**
+     * which supplier lowest price in last one month (one months form latest purchase) and cost
+     * current stock of the product
+     */
+    let { customer_id } = req.body;
+    let currentProducts = [];
+    try {
+        //Gathering all products and their current stock
+        let query1 = {
+            name: `Gathering all products and their current stock`,
+            text: `SELECT ps.product_id, p.product_name, ps.current_quantity FROM product_stock AS ps
+            JOIN product AS p ON ps.product_id = p.product_id
+            WHERE ps.customer_id = $1 ;`,
+            values: [customer_id]
+        }
+        const queryResult1 = await executeDBQuery(query1);
+        currentProducts = queryResult1.rows;
+        //Finding latest supplied supplier's price
+        for (let i = 0; i < currentProducts.length; i++) {
+            currentProducts[i];
+            let query2 = {
+                name: `Finding latest supplied supplier's price`,
+                text: `SELECT supplier_name, unit_price, date FROM invoice_item as ii
+                JOIN supplier as s ON s.supplier_id = ii.supplier_id
+                WHERE product_id = $1 AND customer_id = $2 
+                ORDER BY date DESC LIMIT 1;`,
+                values: [currentProducts[i].product_id, customer_id]
+            }
+            await executeDBQuery(query2).then(queryResult2 => {
+                currentProducts[i].latest_supplier_name = queryResult2.rows[0].supplier_name;
+                currentProducts[i].latest_supplier_unit_price = queryResult2.rows[0].unit_price;
+                currentProducts[i].latest_supplier_date = queryResult2.rows[0].date;
+            });
+        }
+        for (let i = 0; i < currentProducts.length; i++) {
+            //Finding one month before latest puchase date
+            const date = new Date(currentProducts[i].latest_supplier_date);
+            date.setMonth(date.getMonth() - 1);
+            const one_month_before_date = date.toISOString();
+
+            let query3 = {
+                name: `Cheapest supplier supplying within last month`,
+                text: `SELECT supplier_name, date, unit_price 
+                FROM invoice_item AS ii 
+                JOIN supplier as s ON s.supplier_id = ii.supplier_id
+                WHERE product_id = $1 AND customer_id = $2
+                AND date BETWEEN $3 AND $4
+                ORDER BY unit_price ASC
+                LIMIT 1;`,
+                values: [currentProducts[i].product_id, customer_id, one_month_before_date, currentProducts[i].latest_supplier_date]
+            }
+
+            await executeDBQuery(query3).then(queryResult3 => {
+                currentProducts[i].min_supplier_name = queryResult3.rows[0].supplier_name;
+                currentProducts[i].min_supplier_unit_price = queryResult3.rows[0].unit_price;
+                currentProducts[i].min_supplier_date = queryResult3.rows[0].date;
+                console.log(queryResult3.rows[0]);
+            });
+        }
+        return res.status(201).json({ success: true, data: currentProducts, count: currentProducts.length });
+    }
+    catch (error) {
+        return res.status(500).json({ success: false, msg: error.message });
+    }
+}
+module.exports = { findMinPriceBetweenTwoDates, findMinPriceBetweenTwoDates_FuzzySearch, customerProductPriceTracking }
