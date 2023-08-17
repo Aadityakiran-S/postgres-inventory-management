@@ -4,6 +4,7 @@ specifiers:
   bcrypt: ^5.1.0
   dotenv: ^16.0.3
   express: ^4.18.2
+  node-xlsx: ^0.23.0
   nodemon: ^2.0.21
   pg: ^8.11.0
 
@@ -11,6 +12,7 @@ dependencies:
   bcrypt: 5.1.0
   dotenv: 16.3.1
   express: 4.18.2
+  node-xlsx: 0.23.0
   pg: 8.11.0
 
 devDependencies:
@@ -637,6 +639,14 @@ packages:
       whatwg-url: 5.0.0
     dev: false
 
+  /node-xlsx/0.23.0:
+    resolution: {integrity: sha512-r3KaSZSsSrK92rbPXnX/vDdxURmPPik0rjJ3A+Pybzpjyrk4G6WyGfj8JIz5dMMEpCmWVpmO4qoVPBxnpLv/8Q==}
+    engines: {node: '>=10.0.0'}
+    hasBin: true
+    dependencies:
+      xlsx: '@cdn.sheetjs.com/xlsx-0.19.3/xlsx-0.19.3.tgz'
+    dev: false
+
   /nodemon/2.0.22:
     resolution: {integrity: sha512-B8YqaKMmyuCO7BowF1Z1/mkPqLk6cs/l63Ojtd6otKjMx47Dq1utxfRxcavH1I7VSaL8n5BUaoutadnsX3AAVQ==}
     engines: {node: '>=8.10.0'}
@@ -1095,4 +1105,12 @@ packages:
 
   /yallist/4.0.0:
     resolution: {integrity: sha512-3wdGidZyq5PB084XLES5TpOSRA3wjXAlIWMhum2kRcv/41Sn2emQ0dycQW4uZXLejwKvg6EsvbdlVL+FYEct7A==}
+    dev: false
+
+  '@cdn.sheetjs.com/xlsx-0.19.3/xlsx-0.19.3.tgz':
+    resolution: {tarball: https://cdn.sheetjs.com/xlsx-0.19.3/xlsx-0.19.3.tgz}
+    name: xlsx
+    version: 0.19.3
+    engines: {node: '>=0.8'}
+    hasBin: true
     dev: false

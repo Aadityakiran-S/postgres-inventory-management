@@ -1,4 +1,4 @@
-const { query } = require('express');
+const xlsx = require('node-xlsx'); const fs = require('fs');
 const executeDBQuery = require('../../helpers/query-execution-helper.js');
 
 const findMinPriceBetweenTwoDates = async (req, res) => {
@@ -93,10 +93,6 @@ const findMinPriceBetweenTwoDates_FuzzySearch = async (req, res) => {
 }
 
 const customerProductPriceTracking = async (req, res) => {
-    /**
-     * which supplier lowest price in last one month (one months form latest purchase) and cost
-     * current stock of the product
-     */
     let { customer_id } = req.body;
     let currentProducts = [];
     try {
@@ -145,14 +141,32 @@ const customerProductPriceTracking = async (req, res) => {
                 values: [currentProducts[i].product_id, customer_id, one_month_before_date, currentProducts[i].latest_supplier_date]
             }
 
+            //#TOASK: To prevent a promise skipped condition, we have to write the rest inside this. That doesn't look good. How to avoid that?
             await executeDBQuery(query3).then(queryResult3 => {
                 currentProducts[i].min_supplier_name = queryResult3.rows[0].supplier_name;
                 currentProducts[i].min_supplier_unit_price = queryResult3.rows[0].unit_price;
                 currentProducts[i].min_supplier_date = queryResult3.rows[0].date;
-                console.log(queryResult3.rows[0]);
             });
+            //#region Writing to Excel file
+            // Get the column names from the first row of the result
+            const columnNames = Object.keys(currentProducts[0]);
+
+            // Create an array of arrays, where each inner array represents a row in the Excel file
+            const data = [columnNames];
+
+            // Add the data from the SQL query result to the data array
+            for (const row of currentProducts) {
+                data.push(Object.values(row));
+            }
+
+            // Create a buffer from the data array
+            const buffer = xlsx.build([{ name: "Sheet1", data }]);
+
+            const filePath = './excel_sheets/output.xlsx';
+            fs.writeFileSync(filePath, buffer);
+            //#endregion
         }
-        return res.status(201).json({ success: true, data: currentProducts, count: currentProducts.length });
+        return res.status(201).json({ success: true, count: currentProducts.length, data: currentProducts });
     }
     catch (error) {
         return res.status(500).json({ success: false, msg: error.message });
