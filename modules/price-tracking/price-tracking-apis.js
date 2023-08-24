@@ -1,5 +1,6 @@
-const xlsx = require('node-xlsx'); const fs = require('fs');
+const xlsx = require('node-xlsx'); const fs = require('fs'); const AWS = require('aws-sdk');
 const executeDBQuery = require('../../helpers/query-execution-helper.js');
+const { format } = require('path');
 
 const findMinPriceBetweenTwoDates = async (req, res) => {
     let { product_name, start_date, end_date, customer_id } = req.body;
@@ -96,12 +97,12 @@ const customerProductPriceTracking = async (req, res) => {
     let { customer_id } = req.body;
     let currentProducts = [];
     try {
-        //Gathering all products and their current stock
+        //#region Gathering all products and their current stock
         let query1 = {
             name: `Gathering all products and their current stock`,
             text: `SELECT ps.product_id, p.product_name, ps.current_quantity FROM product_stock AS ps
             JOIN product AS p ON ps.product_id = p.product_id
-            WHERE ps.customer_id = $1 ;`,
+            WHERE ps.customer_id = $1;`,
             values: [customer_id]
         }
         const queryResult1 = await executeDBQuery(query1);
@@ -123,8 +124,10 @@ const customerProductPriceTracking = async (req, res) => {
                 currentProducts[i].latest_supplier_date = queryResult2.rows[0].date;
             });
         }
+        //#endregion
+
+        //#region Finding one month before latest puchase date
         for (let i = 0; i < currentProducts.length; i++) {
-            //Finding one month before latest puchase date
             const date = new Date(currentProducts[i].latest_supplier_date);
             date.setMonth(date.getMonth() - 1);
             const one_month_before_date = date.toISOString();
@@ -143,33 +146,86 @@ const customerProductPriceTracking = async (req, res) => {
 
             //#TOASK: To prevent a promise skipped condition, we have to write the rest inside this. That doesn't look good. How to avoid that?
             await executeDBQuery(query3).then(queryResult3 => {
-                currentProducts[i].min_supplier_name = queryResult3.rows[0].supplier_name;
-                currentProducts[i].min_supplier_unit_price = queryResult3.rows[0].unit_price;
-                currentProducts[i].min_supplier_date = queryResult3.rows[0].date;
+                currentProducts[i].minimum_supplier_name = queryResult3.rows[0].supplier_name;
+                currentProducts[i].minimum_supplier_unit_price = queryResult3.rows[0].unit_price;
+                currentProducts[i].minimum_supplier_date = queryResult3.rows[0].date;
             });
-            //#region Writing to Excel file
-            // Get the column names from the first row of the result
-            const columnNames = Object.keys(currentProducts[0]);
-
-            // Create an array of arrays, where each inner array represents a row in the Excel file
-            const data = [columnNames];
-
-            // Add the data from the SQL query result to the data array
-            for (const row of currentProducts) {
-                data.push(Object.values(row));
-            }
-
-            // Create a buffer from the data array
-            const buffer = xlsx.build([{ name: "Sheet1", data }]);
-
-            const filePath = './excel_sheets/output.xlsx';
-            fs.writeFileSync(filePath, buffer);
-            //#endregion
         }
-        return res.status(201).json({ success: true, count: currentProducts.length, data: currentProducts });
+        //#endregion
+
+        //#region Writing to Excel file
+        // Get the column names from the first row of the result
+        let columnNames = Object.keys(currentProducts[0]);
+        columnNames = columnNames.map(name => {
+            // Replace underscores with spaces
+            let formattedName = name.replace(/_/g, ' ');
+            // Capitalize the first letter of each word and make the rest of the letters uppercase
+            formattedName = formattedName.replace(/\b\w/g, c => c.toUpperCase());
+            return formattedName;
+        });
+
+        // Create an array of arrays, where each inner array represents a row in the Excel file
+        const data = [columnNames];
+
+        // Add the data from the SQL query result to the data array
+        for (const row of currentProducts) {
+            data.push(Object.values(row));
+        }
+
+        // Create a buffer from the data array
+        const buffer = xlsx.build([{ name: "Sheet1", data }]);
+
+        const filePath = './excel_sheets/output.xlsx';
+        fs.writeFileSync(filePath, buffer);
+        //#endregion
+
+        //#region  Upload the file to S3 and create URL
+        // Create an S3 client
+        const s3 = new AWS.S3({
+            signatureVersion: 'v4'
+        });
+
+        // Set the parameters for the upload
+        //#TOASK: 1) Pass bucket name dynamically? Maybe in env variables? 2) How to securely store secrets like AWS Credentials in app? Using .env variables not a good idea if the server is compromized right?
+        const uploadParams = {
+            Bucket: 'garibaldi-arken-sheet-bucket',
+            Key: 'output.xlsx',
+            Body: buffer,
+        };
+
+        var uploadLocation = await uploadToS3(s3, uploadParams);
+        //#endregion
+
+        return res.status(201).json({ success: true, count: currentProducts.length, sheet_url: uploadLocation, data: currentProducts });
     }
     catch (error) {
         return res.status(500).json({ success: false, msg: error.message });
     }
 }
+
+//#region  Private functions
+async function uploadToS3(s3, uploadParams) {
+    try {
+        // Upload the object to Amazon S3
+        const data = await s3.upload(uploadParams).promise();
+        console.log(`Object uploaded to: ${data.Location}`);
+
+        // Set the parameters for the pre-signed URL
+        const signedUrlParams = {
+            Bucket: uploadParams.Bucket,
+            Key: uploadParams.Key,
+            Expires: 21600 // 6 hours in seconds
+        };
+
+        // Generate the pre-signed URL
+        const url = await s3.getSignedUrlPromise('getObject', signedUrlParams);
+        console.log(`The pre-signed URL is: ${url}`);
+        return url;
+    } catch (err) {
+        console.log("Error", err);
+    }
+}
+
+//#endregion
+
 module.exports = { findMinPriceBetweenTwoDates, findMinPriceBetweenTwoDates_FuzzySearch, customerProductPriceTracking }
