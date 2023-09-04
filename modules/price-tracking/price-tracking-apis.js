@@ -94,6 +94,8 @@ const findMinPriceBetweenTwoDates_FuzzySearch = async (req, res) => {
 }
 
 const customerProductPriceTracking = async (req, res) => {
+    //#TODO: Add feature to search by productID also
+    //#TODO: Just previous supplier price and date
     let { customer_id } = req.body;
     let currentProducts = [];
     try {
@@ -114,9 +116,9 @@ const customerProductPriceTracking = async (req, res) => {
                 name: `Finding latest supplied supplier's price`,
                 text: `SELECT supplier_name, unit_price, date FROM invoice_item as ii
                 JOIN supplier as s ON s.supplier_id = ii.supplier_id
-                WHERE product_id = $1 AND customer_id = $2 
+                WHERE product_id = $1  
                 ORDER BY date DESC LIMIT 1;`,
-                values: [currentProducts[i].product_id, customer_id]
+                values: [currentProducts[i].product_id]
             }
             await executeDBQuery(query2).then(queryResult2 => {
                 currentProducts[i].latest_supplier_name = queryResult2.rows[0].supplier_name;
@@ -133,7 +135,7 @@ const customerProductPriceTracking = async (req, res) => {
             const one_month_before_date = date.toISOString();
 
             let query3 = {
-                name: `Cheapest supplier supplying within last month`,
+                name: `Cheapest supplier supplying within last month for any customer`,
                 text: `SELECT supplier_name, date, unit_price 
                 FROM invoice_item AS ii 
                 JOIN supplier as s ON s.supplier_id = ii.supplier_id
@@ -145,6 +147,7 @@ const customerProductPriceTracking = async (req, res) => {
             }
 
             //#TOASK: To prevent a promise skipped condition, we have to write the rest inside this. That doesn't look good. How to avoid that?
+            //#TODO: Change this to await and see if it works
             await executeDBQuery(query3).then(queryResult3 => {
                 currentProducts[i].minimum_supplier_name = queryResult3.rows[0].supplier_name;
                 currentProducts[i].minimum_supplier_unit_price = queryResult3.rows[0].unit_price;
@@ -186,7 +189,6 @@ const customerProductPriceTracking = async (req, res) => {
         });
 
         // Set the parameters for the upload
-        //#TOASK: 1) Pass bucket name dynamically? Maybe in env variables? 2) How to securely store secrets like AWS Credentials in app? Using .env variables not a good idea if the server is compromized right?
         const uploadParams = {
             Bucket: 'garibaldi-arken-sheet-bucket',
             Key: 'output.xlsx',
@@ -208,7 +210,6 @@ async function uploadToS3(s3, uploadParams) {
     try {
         // Upload the object to Amazon S3
         const data = await s3.upload(uploadParams).promise();
-        console.log(`Object uploaded to: ${data.Location}`);
 
         // Set the parameters for the pre-signed URL
         const signedUrlParams = {
@@ -219,7 +220,6 @@ async function uploadToS3(s3, uploadParams) {
 
         // Generate the pre-signed URL
         const url = await s3.getSignedUrlPromise('getObject', signedUrlParams);
-        console.log(`The pre-signed URL is: ${url}`);
         return url;
     } catch (err) {
         console.log("Error", err);
