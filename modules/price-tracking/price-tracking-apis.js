@@ -109,6 +109,7 @@ const customerProductPriceTracking = async (req, res) => {
         }
         const queryResult1 = await executeDBQuery(query1);
         currentProducts = queryResult1.rows;
+        // console.log(currentProducts);
         //Finding latest supplied supplier's price
         for (let i = 0; i < currentProducts.length; i++) {
             currentProducts[i];
@@ -116,14 +117,25 @@ const customerProductPriceTracking = async (req, res) => {
                 name: `Finding latest supplied supplier's price`,
                 text: `SELECT supplier_name, unit_price, date FROM invoice_item as ii
                 JOIN supplier as s ON s.supplier_id = ii.supplier_id
-                WHERE product_id = $1  
-                ORDER BY date DESC LIMIT 1;`,
-                values: [currentProducts[i].product_id]
+                WHERE product_id = $1 AND customer_id = $2
+                ORDER BY date DESC LIMIT 2;`,
+                values: [currentProducts[i].product_id, customer_id]
             }
             await executeDBQuery(query2).then(queryResult2 => {
                 currentProducts[i].latest_supplier_name = queryResult2.rows[0].supplier_name;
                 currentProducts[i].latest_supplier_unit_price = queryResult2.rows[0].unit_price;
                 currentProducts[i].latest_supplier_date = queryResult2.rows[0].date;
+
+                //In case no previous to this one supplier exists
+                currentProducts[i].prev_supplier_name = "";
+                currentProducts[i].prev_supplier_unit_price = "";
+                currentProducts[i].prev_supplier_date = "";
+
+                if (queryResult2.rows.length > 1) { //If second element also exists
+                    currentProducts[i].prev_supplier_name = queryResult2.rows[1].supplier_name;
+                    currentProducts[i].prev_supplier_unit_price = queryResult2.rows[1].unit_price;;
+                    currentProducts[i].prev_supplier_date = queryResult2.rows[1].date;;
+                }
             });
         }
         //#endregion
@@ -139,19 +151,19 @@ const customerProductPriceTracking = async (req, res) => {
                 text: `SELECT supplier_name, date, unit_price 
                 FROM invoice_item AS ii 
                 JOIN supplier as s ON s.supplier_id = ii.supplier_id
-                WHERE product_id = $1 AND customer_id = $2
-                AND date BETWEEN $3 AND $4
+                WHERE product_id = $1
+                AND date BETWEEN $2 AND $3
                 ORDER BY unit_price ASC
                 LIMIT 1;`,
-                values: [currentProducts[i].product_id, customer_id, one_month_before_date, currentProducts[i].latest_supplier_date]
+                values: [currentProducts[i].product_id, one_month_before_date, currentProducts[i].latest_supplier_date]
             }
 
             //#TOASK: To prevent a promise skipped condition, we have to write the rest inside this. That doesn't look good. How to avoid that?
             //#TODO: Change this to await and see if it works
             await executeDBQuery(query3).then(queryResult3 => {
-                currentProducts[i].minimum_supplier_name = queryResult3.rows[0].supplier_name;
-                currentProducts[i].minimum_supplier_unit_price = queryResult3.rows[0].unit_price;
-                currentProducts[i].minimum_supplier_date = queryResult3.rows[0].date;
+                currentProducts[i].minimum_overall_supplier_name = queryResult3.rows[0].supplier_name;
+                currentProducts[i].minimum_overall_supplier_unit_price = queryResult3.rows[0].unit_price;
+                currentProducts[i].minimum_overall_supplier_date = queryResult3.rows[0].date;
             });
         }
         //#endregion
