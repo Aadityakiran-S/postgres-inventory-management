@@ -114,7 +114,7 @@ const customerProductPriceTracking = async (req, res) => {
         for (let i = 0; i < currentProducts.length; i++) {
             currentProducts[i];
             let query2 = {
-                name: `Finding latest supplied supplier's price`,
+                name: `Finding latest supplied supplier's price that the given customer bought from`,
                 text: `SELECT supplier_name, unit_price, date FROM invoice_item as ii
                 JOIN supplier as s ON s.supplier_id = ii.supplier_id
                 WHERE product_id = $1 AND customer_id = $2
