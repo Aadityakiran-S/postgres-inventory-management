@@ -95,7 +95,6 @@ const findMinPriceBetweenTwoDates_FuzzySearch = async (req, res) => {
 }
 
 const customerProductPriceTracking = async (req, res) => {
-    //#TODO: Add feature to search by productID also
     let { customer_id, products } = req.body;
     let currentProducts = [];
     try {
@@ -158,31 +157,29 @@ const customerProductPriceTracking = async (req, res) => {
                 ORDER BY date DESC LIMIT 2;`,
                 values: [currentProducts[i].product_id, customer_id]
             }
-            await executeDBQuery(query2).then(queryResult2 => {
+            let queryResult2 = await executeDBQuery(query2);
+            //In case this product was never bought
+            currentProducts[i].latest_supplier_name = "";
+            currentProducts[i].latest_supplier_unit_price = "";
+            currentProducts[i].latest_supplier_date = "";
 
-                //In case this product was never bought
-                currentProducts[i].latest_supplier_name = "";
-                currentProducts[i].latest_supplier_unit_price = "";
-                currentProducts[i].latest_supplier_date = "";
 
+            if (queryResult2.rows.length > 0) { //If first element exists
+                currentProducts[i].latest_supplier_name = queryResult2.rows[0].supplier_name;
+                currentProducts[i].latest_supplier_unit_price = queryResult2.rows[0].unit_price;
+                currentProducts[i].latest_supplier_date = queryResult2.rows[0].date;
+            }
 
-                if (queryResult2.rows.length > 0) { //If first element exists
-                    currentProducts[i].latest_supplier_name = queryResult2.rows[0].supplier_name;
-                    currentProducts[i].latest_supplier_unit_price = queryResult2.rows[0].unit_price;
-                    currentProducts[i].latest_supplier_date = queryResult2.rows[0].date;
-                }
+            //In case no previous to this one supplier exists
+            currentProducts[i].prev_supplier_name = "";
+            currentProducts[i].prev_supplier_unit_price = "";
+            currentProducts[i].prev_supplier_date = "";
 
-                //In case no previous to this one supplier exists
-                currentProducts[i].prev_supplier_name = "";
-                currentProducts[i].prev_supplier_unit_price = "";
-                currentProducts[i].prev_supplier_date = "";
-
-                if (queryResult2.rows.length > 1) { //If second element also exists
-                    currentProducts[i].prev_supplier_name = queryResult2.rows[1].supplier_name;
-                    currentProducts[i].prev_supplier_unit_price = queryResult2.rows[1].unit_price;;
-                    currentProducts[i].prev_supplier_date = queryResult2.rows[1].date;
-                }
-            });
+            if (queryResult2.rows.length > 1) { //If second element also exists
+                currentProducts[i].prev_supplier_name = queryResult2.rows[1].supplier_name;
+                currentProducts[i].prev_supplier_unit_price = queryResult2.rows[1].unit_price;;
+                currentProducts[i].prev_supplier_date = queryResult2.rows[1].date;
+            }
         }
         //#endregion
 
@@ -204,13 +201,10 @@ const customerProductPriceTracking = async (req, res) => {
                 values: [currentProducts[i].product_id, one_month_before_date, currentProducts[i].latest_supplier_date]
             }
 
-            //#TOASK: To prevent a promise skipped condition, we have to write the rest inside this. That doesn't look good. How to avoid that?
-            //#TODO: Change this to await and see if it works
-            await executeDBQuery(query3).then(queryResult3 => {
-                currentProducts[i].minimum_overall_supplier_name = queryResult3.rows[0].supplier_name;
-                currentProducts[i].minimum_overall_supplier_unit_price = queryResult3.rows[0].unit_price;
-                currentProducts[i].minimum_overall_supplier_date = queryResult3.rows[0].date;
-            });
+            let queryResult3 = await executeDBQuery(query3);
+            currentProducts[i].minimum_overall_supplier_name = queryResult3.rows[0].supplier_name;
+            currentProducts[i].minimum_overall_supplier_unit_price = queryResult3.rows[0].unit_price;
+            currentProducts[i].minimum_overall_supplier_date = queryResult3.rows[0].date;
         }
         //#endregion
 
