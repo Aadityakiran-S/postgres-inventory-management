@@ -1,6 +1,7 @@
 const xlsx = require('node-xlsx'); const fs = require('fs'); const AWS = require('aws-sdk');
 const executeDBQuery = require('../../helpers/query-execution-helper.js');
 const { format } = require('path');
+const { query } = require('express');
 
 const findMinPriceBetweenTwoDates = async (req, res) => {
     let { product_name, start_date, end_date, customer_id } = req.body;
@@ -95,26 +96,62 @@ const findMinPriceBetweenTwoDates_FuzzySearch = async (req, res) => {
 
 const customerProductPriceTracking = async (req, res) => {
     //#TODO: Add feature to search by productID also
-    //#TODO: Just previous supplier price and date
-    let { customer_id } = req.body;
+    let { customer_id, products } = req.body;
     let currentProducts = [];
     try {
-        //#region Gathering all products and their current stock
-        let query1 = {
-            name: `Gathering all products and their current stock`,
-            text: `SELECT ps.product_id, p.product_name, ps.current_quantity FROM product_stock AS ps
-            JOIN product AS p ON ps.product_id = p.product_id
-            WHERE ps.customer_id = $1;`,
-            values: [customer_id]
+        //#region Product Search is required
+        if (products != null && products.length != 0) {
+            for (let index = 0; index < products.length; index++) {
+                let query1 = {
+                    name: `Checking if product with given name exists in a fuzzy manner`,
+                    text: `SELECT product_id, product_name
+                    FROM product 
+                    WHERE product_name ILIKE $1;`,
+                    values: [`%${products[index]}%`]
+                }
+                const queryResult1 = await executeDBQuery(query1);
+                //If some products returned from this query
+                if (queryResult1.rows.length !== 0) {
+                    for (let i = 0; i < queryResult1.rows.length; i++) {
+                        const element = queryResult1.rows[i];
+                        //Getting current_quantity of each product that we search for
+                        let query1 = {
+                            name: `Gathering all products and their current stock`,
+                            text: `SELECT ps.product_id, p.product_name, ps.current_quantity FROM product_stock AS ps
+                            JOIN product AS p ON ps.product_id = p.product_id
+                            WHERE ps.customer_id = $1 AND ps.product_id = $2;`,
+                            values: [customer_id, element.product_id]
+                        }
+                        const queryResult1Point5 = await executeDBQuery(query1);
+                        if (queryResult1Point5.rows.length !== 0) {
+                            currentProducts.push(queryResult1Point5.rows[0]);
+                        }
+                    }
+                }
+            }
         }
-        const queryResult1 = await executeDBQuery(query1);
-        currentProducts = queryResult1.rows;
-        // console.log(currentProducts);
-        //Finding latest supplied supplier's price
+        //#endregion
+
+        //#region If no products specifically to search for are given, search for all products in stock of that customer
+        else {
+            //Gathering all products and their current stock
+            let query1 = {
+                name: `Gathering all products and their current stock`,
+                text: `SELECT ps.product_id, p.product_name, ps.current_quantity FROM product_stock AS ps
+                JOIN product AS p ON ps.product_id = p.product_id
+                WHERE ps.customer_id = $1;`,
+                values: [customer_id]
+            }
+            const queryResult1 = await executeDBQuery(query1);
+            currentProducts = queryResult1.rows;
+        }
+        //#endregion
+
+        //#region Finding latest and just before latest supplied supplier's purchase details
         for (let i = 0; i < currentProducts.length; i++) {
             currentProducts[i];
             let query2 = {
-                name: `Finding latest supplied supplier's price that the given customer bought from`,
+                name: `Latest Supplier's price`,
                 text: `SELECT supplier_name, unit_price, date FROM invoice_item as ii
                 JOIN supplier as s ON s.supplier_id = ii.supplier_id
                 WHERE product_id = $1 AND customer_id = $2
@@ -122,9 +159,18 @@ const customerProductPriceTracking = async (req, res) => {
                 values: [currentProducts[i].product_id, customer_id]
             }
             await executeDBQuery(query2).then(queryResult2 => {
-                currentProducts[i].latest_supplier_name = queryResult2.rows[0].supplier_name;
-                currentProducts[i].latest_supplier_unit_price = queryResult2.rows[0].unit_price;
-                currentProducts[i].latest_supplier_date = queryResult2.rows[0].date;
+
+                //In case this product was never bought
+                currentProducts[i].latest_supplier_name = "";
+                currentProducts[i].latest_supplier_unit_price = "";
+                currentProducts[i].latest_supplier_date = "";
+
+
+                if (queryResult2.rows.length > 0) { //If first element exists
+                    currentProducts[i].latest_supplier_name = queryResult2.rows[0].supplier_name;
+                    currentProducts[i].latest_supplier_unit_price = queryResult2.rows[0].unit_price;
+                    currentProducts[i].latest_supplier_date = queryResult2.rows[0].date;
+                }
 
                 //In case no previous to this one supplier exists
                 currentProducts[i].prev_supplier_name = "";
@@ -134,7 +180,7 @@ const customerProductPriceTracking = async (req, res) => {
                 if (queryResult2.rows.length > 1) { //If second element also exists
                     currentProducts[i].prev_supplier_name = queryResult2.rows[1].supplier_name;
                     currentProducts[i].prev_supplier_unit_price = queryResult2.rows[1].unit_price;;
-                    currentProducts[i].prev_supplier_date = queryResult2.rows[1].date;;
+                    currentProducts[i].prev_supplier_date = queryResult2.rows[1].date;
                 }
             });
         }
